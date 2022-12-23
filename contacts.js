@@ -3,6 +3,7 @@ const morgan = require("morgan");
 const { body, validationResult } = require("express-validator");
 const session = require("express-session");
 const store = require("connect-loki");
+const flash = require("express-flash");
 
 const app = express();
 const LokiStore = store(session);
@@ -75,11 +76,19 @@ app.use(
   })
 );
 
+app.use(flash());
+
 app.use((req, res, next) => {
   if (!("contactData" in req.session)) {
     req.session.contactData = clone(contactData);
   }
 
+  next();
+});
+
+app.use((req, res, next) => {
+  res.locals.flash = req.session.flash;
+  delete req.session.flash;
   next();
 });
 
@@ -128,8 +137,10 @@ app.post(
   (req, res, next) => {
     let errors = validationResult(req);
     if (!errors.isEmpty()) {
+      errors.array().forEach((error) => req.flash("error", error.msg));
+
       res.render("new-contact", {
-        errorMessages: errors.array().map((error) => error.msg),
+        flash: req.flash(),
         firstName: req.body.firstName,
         lastName: req.body.lastName,
         phoneNumber: req.body.phoneNumber,
@@ -141,6 +152,7 @@ app.post(
   (req, res) => {
     req.session.contactData.push({ ...req.body });
 
+    req.flash("success", "New contact added to list!");
     res.redirect("/contacts");
   }
 );
