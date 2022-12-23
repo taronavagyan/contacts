@@ -65,11 +65,96 @@ app.get("/contacts/new", (req, res) => {
   res.render("new-contact");
 });
 
-app.post("/contacts/new", (req, res) => {
-  contactData.push({ ...req.body });
+const isAlphabetic = (text) => /^[a-z]+$/i.test(text);
 
-  res.redirect("/contacts");
-});
+app.post(
+  "/contacts/new",
+  (req, res, next) => {
+    res.locals.errorMessages = [];
+    next();
+  },
+  (req, res, next) => {
+    // trim whitespace
+    res.locals.firstName = req.body.firstName.trim();
+    res.locals.lastName = req.body.lastName.trim();
+    res.locals.phoneNumber = req.body.phoneNumber.trim();
+    next();
+  },
+  (req, res, next) => {
+    let firstName = res.locals.firstName;
+    if (firstName.length === 0) {
+      res.locals.errorMessages.push("First name is required.");
+    } else if (firstName.length > 25) {
+      res.locals.errorMessages.push(
+        "First name is too long. Maximum length is 25 characters."
+      );
+    } else if (!isAlphabetic(firstName)) {
+      res.locals.errorMessages.push(
+        "First name contains invalid characters. The name must be alphabetic."
+      );
+    }
+
+    next();
+  },
+  (req, res, next) => {
+    let lastName = res.locals.lastName;
+    if (lastName.length === 0) {
+      res.locals.errorMessages.push("Last name is required.");
+    } else if (lastName.length > 25) {
+      res.locals.errorMessages.push(
+        "Last name is too long. Maximum length is 25 characters."
+      );
+    } else if (!isAlphabetic(lastName)) {
+      res.locals.errorMessages.push(
+        "Last name contains invalid characters. The name must be alphabetic."
+      );
+    }
+
+    next();
+  },
+  (req, res, next) => {
+    let phoneNumber = res.locals.phoneNumber;
+    if (phoneNumber.length === 0) {
+      res.locals.errorMessages.push("Phone number is required.");
+    } else if (!/^\d\d\d-\d\d\d-\d\d\d\d$/.test(phoneNumber)) {
+      res.locals.errorMessages.push(
+        "Invalid phone number format. Use ###-###-####."
+      );
+    }
+
+    next();
+  },
+  (req, res, next) => {
+    // check for duplicates
+    let fullName = `${res.locals.firstName} ${res.locals.lastName}`;
+    let foundContact = contactData.find((contact) => {
+      return `${contact.firstName} ${contact.lastName}` === fullName;
+    });
+
+    if (foundContact) {
+      res.locals.errorMessages.push(
+        `${fullName} is already on your contact list. Duplicates are not allowed.`
+      );
+    }
+
+    next();
+  },
+  (req, res, next) => {
+    if (res.locals.errorMessages.length > 0) {
+      res.render("new-contact", {
+        ...req.body,
+        errorMessages: res.locals.errorMessages,
+      });
+    } else {
+      next();
+    }
+  },
+  (req, res) => {
+    contactData.push({ ...req.body });
+
+    res.redirect("/contacts");
+  }
+);
 
 app.listen(3000, "localhost", () => {
   console.log("Listening to port 3000.");
